@@ -1,7 +1,7 @@
 # jackie_skills
 
-> A collection of [Claude Code](https://claude.ai/code) skills.
-> 一组 [Claude Code](https://claude.ai/code) 技能集合。
+> A collection of [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) skills.
+> 一组 [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) 技能集合。
 
 [English](#english) · [中文](#中文)
 
@@ -21,7 +21,7 @@ The idea: most AI tools look for an `AGENTS.md`, while Claude Code looks for `CL
 
 - **First run on a new project** → calls the built-in `/init` to scan the codebase, then restructures the output into `AGENTS.md` (body) + `CLAUDE.md` (`@AGENTS.md` reference).
 - **On an existing project** → incrementally syncs docs from `git diff` as an *editor, not a logger*: updates affected sections, merges duplicates, removes stale info, fixes contradictions. Never rebuilds the whole file.
-- **Optionally** installs a project-level `pre-push` git hook that auto-syncs docs before push (opt-in, project-scoped — never touches other repos).
+- **Optionally** installs a project-level `pre-push` git hook that auto-syncs docs before push (opt-in, project-scoped — never touches other repos). The hook auto-detects `claude` or `opencode` CLI (override with `DOCSYNC_CLI`).
 
 **Design principles:**
 
@@ -31,21 +31,25 @@ The idea: most AI tools look for an `AGENTS.md`, while Claude Code looks for `CL
 
 ### Install
 
-Clone into your Claude Code skills directory:
+Works in both **Claude Code** and **opencode** (opencode natively discovers `~/.claude/skills/`).
 
 ```bash
-# user-level (all projects)
 git clone https://github.com/15862972059/jackie_skills.git
+
+# Claude Code — user-level (all projects)
 cp -r jackie_skills/md ~/.claude/skills/md
+
+# opencode — also reads ~/.claude/skills, or use its own dir:
+cp -r jackie_skills/md ~/.config/opencode/skills/md
 ```
 
-Or for a single project:
+Or for a single project (both tools read `.claude/skills/`):
 
 ```bash
 cp -r jackie_skills/md <your-project>/.claude/skills/md
 ```
 
-Then run `/md` in Claude Code.
+Then run `/md` in Claude Code or opencode.
 
 ---
 
@@ -63,7 +67,7 @@ Then run `/md` in Claude Code.
 
 - **新项目首次执行** → 调用内置 `/init` 扫描代码库，再把产物重构成 `AGENTS.md`（正文）+ `CLAUDE.md`（`@AGENTS.md` 引用）。
 - **已有项目** → 以「编辑者而非记录员」的视角，根据 `git diff` 增量同步：更新受影响章节、合并重复、删除过期、修正矛盾，绝不重建整份文件。
-- **可选** 安装项目级 `pre-push` git 钩子，push 前自动同步文档（按需启用、仅作用于本仓库，绝不影响其它 repo）。
+- **可选** 安装项目级 `pre-push` git 钩子，push 前自动同步文档（按需启用、仅作用于本仓库，绝不影响其它 repo）。钩子自动探测 `claude` 或 `opencode` CLI（可用 `DOCSYNC_CLI` 强制指定）。
 
 **设计原则：**
 
@@ -73,21 +77,25 @@ Then run `/md` in Claude Code.
 
 ### 安装
 
-克隆到 Claude Code 技能目录：
+**Claude Code 和 opencode 均可用**（opencode 原生识别 `~/.claude/skills/`）。
 
 ```bash
-# 用户级（所有项目生效）
 git clone https://github.com/15862972059/jackie_skills.git
+
+# Claude Code — 用户级（所有项目生效）
 cp -r jackie_skills/md ~/.claude/skills/md
+
+# opencode — 同样读 ~/.claude/skills，或放到它自己的目录：
+cp -r jackie_skills/md ~/.config/opencode/skills/md
 ```
 
-或仅装到单个项目：
+或仅装到单个项目（两个工具都读 `.claude/skills/`）：
 
 ```bash
 cp -r jackie_skills/md <你的项目>/.claude/skills/md
 ```
 
-然后在 Claude Code 里运行 `/md`。
+然后在 Claude Code 或 opencode 里运行 `/md`。
 
 ---
 

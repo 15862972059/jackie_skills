@@ -1,11 +1,12 @@
 ---
 name: md
-description: 项目文档单一信息源的初始化与同步。新项目首次执行会调内置 /init 引导生成 AGENTS.md(正文)+CLAUDE.md(@引用);已有文档则以编辑者视角增量同步——合并重复、删过期、修矛盾;并可选装项目级 pre-push 钩子实现提交前自动同步。改完代码想同步/整理文档、或新项目想建文档时用。Triggers when the user types /md or asks to init/update/sync/tidy project docs.
+description: 项目文档单一信息源的初始化与同步。新项目首次执行引导生成 AGENTS.md(正文)+CLAUDE.md(@引用);已有文档则以编辑者视角增量同步——合并重复、删过期、修矛盾;并可选装项目级 pre-push 钩子实现提交前自动同步。改完代码想同步/整理文档、或新项目想建文档时用。Works in both Claude Code and opencode. Triggers when the user types /md or asks to init/update/sync/tidy project docs.
+compatibility: Claude Code, opencode
 ---
 
 # /md — 项目文档的初始化与同步
 
-你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目无关，在当前仓库自适应。
+你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目、与具体 AI 工具无关（Claude Code / opencode 均可用），在当前仓库自适应。
 
 ## 第 0 步：判断走哪条路
 
@@ -29,12 +30,14 @@ ls AGENTS.md agents.md CLAUDE.md 2>/dev/null; wc -l AGENTS.md CLAUDE.md 2>/dev/n
 
 目标产物：`AGENTS.md`（面向所有 AI 工具的正文）+ `CLAUDE.md`（仅 `@AGENTS.md` 引用 + 可放 Claude 专属内容）。
 
-1. **调内置 `/init` 生成基础内容。** 用 Skill 工具调用 `init`，它会扫描代码库生成一份 `CLAUDE.md`。这一步借它的项目扫描能力，省去从零摸索。
+1. **生成基础内容（扫描代码库）。**
+   - **Claude Code**：用 Skill 工具调用内置 `init`，借它的扫描能力生成一份 `CLAUDE.md` 草稿。
+   - **opencode / 其它无内置 init 的工具**：自己扫描代码库（读 README、依赖清单、目录结构、入口文件、路由/模型定义等）整理出项目概况，直接落到 `AGENTS.md`。
 2. **重构成双文件单一信息源：**
-   - 把 `/init` 生成的 `CLAUDE.md` 全部正文**移动**到 `AGENTS.md`（按通用结构组织：项目概述 / 技术栈 / 命令 / 项目结构 / 架构 / 核心业务流程 / 数据库 / API / 数据流 / 开发注意事项 / 部署，只保留项目真有的章节）。
-   - 在 `AGENTS.md` 顶部加 HTML 注释：说明它是面向所有 AI 工具的单一信息源、更新走 `/md`、勿对它运行 `/init`。
+   - 把上一步的正文**移动/整理**到 `AGENTS.md`（按通用结构组织：项目概述 / 技术栈 / 命令 / 项目结构 / 架构 / 核心业务流程 / 数据库 / API / 数据流 / 开发注意事项 / 部署，只保留项目真有的章节）。
+   - 在 `AGENTS.md` 顶部加 HTML 注释：说明它是面向所有 AI 工具的单一信息源、更新走 `/md`、勿对它运行 `/init`（若工具有该命令）。
    - 把 `CLAUDE.md` 改写为：顶部一段「⚠️ 正文在 AGENTS.md，勿 /init 本文件」注释 + 一行 `@AGENTS.md`（其余 Claude 专属内容如有再附后）。
-3. **跨平台说明：** `@AGENTS.md` 是 Claude Code 应用层 import（Win/Mac/Linux 一致）；Codex/opencode/Antigravity 等直接读 `AGENTS.md` 正文，不走 CLAUDE.md。
+3. **跨工具说明：** `@AGENTS.md` 是 Claude Code 应用层 import（Win/Mac/Linux 一致）；opencode 原生读 `AGENTS.md`（也读 `.claude/skills`、`CLAUDE.md`）；Codex/Antigravity 等直接读 `AGENTS.md` 正文。一份正文，各工具各自入口。
 4. 建好后 → 进入下方【可选：装 pre-push 钩子】询问。
 
 ---
@@ -55,7 +58,7 @@ git diff HEAD --stat
 git diff HEAD
 ```
 已提交则比对上次文档同步以来：`git log --oneline -15` + `git diff <last-doc-commit>..HEAD`。
-配了 CodeGraph（`codegraph_*`）就用它核实哪些路由/模型/函数真变了。
+若工具配了代码索引（如 Claude Code 的 CodeGraph `codegraph_*`）就用它核实哪些路由/模型/函数真变了，否则用 grep/读文件确认。
 
 ### 2. 改动 → 章节 影响矩阵
 
@@ -102,7 +105,7 @@ git diff HEAD
 
 ```sh
 #!/bin/sh
-# pre-push: 检测结构性代码改动且本次未同步 AGENTS.md 时，调 claude -p 增量更新。
+# pre-push: 检测结构性代码改动且本次未同步 AGENTS.md 时，调 AI CLI（claude 或 opencode）增量更新。
 # 跳过本次: SKIP_DOCSYNC=1 git push
 set -u
 [ "${SKIP_DOCSYNC:-0}" = "1" ] && exit 0
@@ -124,20 +127,34 @@ structural=$(printf '%s\n' "$changed" | grep -E \
   -e '(^|/)(pages\.json)$' -e '(^|/)migrations?/')
 [ -z "$structural" ] && exit 0
 echo "[docsync] 检测到结构性改动但未同步 AGENTS.md："; printf '  %s\n' $structural | head -20
-CLAUDE_BIN=""
-if command -v claude >/dev/null 2>&1; then CLAUDE_BIN="claude"
-elif [ -n "${APPDATA:-}" ] && [ -f "$APPDATA/npm/claude.cmd" ]; then CLAUDE_BIN="$APPDATA/npm/claude.cmd"
-elif [ -f "$HOME/AppData/Roaming/npm/claude.cmd" ]; then CLAUDE_BIN="$HOME/AppData/Roaming/npm/claude.cmd"; fi
-[ -z "$CLAUDE_BIN" ] && { echo "[docsync] 未找到 claude CLI，跳过。手动 /md 后再 push（或 SKIP_DOCSYNC=1 git push）"; exit 0; }
-echo "[docsync] 正在用 claude 增量更新 AGENTS.md……"
 P="本仓库即将 push。请增量更新根目录 AGENTS.md（单一信息源），只改受影响章节，绝不重建，不碰 CLAUDE.md。改动文件：
 $changed
 先 git diff $range 看改了什么，再对照更新 AGENTS.md 实际存在的对应章节，拿不准的读真实代码确认。无需改动则不动文件。"
-if "$CLAUDE_BIN" -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob" >/dev/null 2>&1; then
+# 探测可用的 AI CLI：优先 claude，其次 opencode（可用 DOCSYNC_CLI 强制指定）
+run_ai() {
+  case "${DOCSYNC_CLI:-auto}" in
+    claude)   claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob" ;;
+    opencode) opencode run "$P" ;;
+    *)
+      if command -v claude >/dev/null 2>&1; then
+        claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
+      elif [ -n "${APPDATA:-}" ] && [ -f "$APPDATA/npm/claude.cmd" ]; then
+        "$APPDATA/npm/claude.cmd" -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
+      elif command -v opencode >/dev/null 2>&1; then
+        opencode run "$P"
+      else
+        return 127
+      fi ;;
+  esac
+}
+echo "[docsync] 正在用 AI CLI 增量更新 AGENTS.md……"
+if run_ai >/dev/null 2>&1; then
   if ! git -C "$repo_root" diff --quiet -- "$AGENTS" 2>/dev/null; then
     echo "[docsync] ✅ AGENTS.md 已更新，请 review 后提交再 push（或 SKIP_DOCSYNC=1 git push 直推）"; exit 1
   else echo "[docsync] 无需改动，放行。"; exit 0; fi
-else echo "[docsync] claude 调用失败，跳过（不阻塞 push）。"; exit 0; fi
+else
+  echo "[docsync] 未找到 claude/opencode CLI 或调用失败，跳过（不阻塞 push）。可手动 /md 后再 push。"; exit 0
+fi
 ```
 
 3. `chmod +x .git/hooks/pre-push`；`sh -n` 验证语法。
@@ -146,4 +163,5 @@ else echo "[docsync] claude 调用失败，跳过（不阻塞 push）。"; exit 
 ## 注意
 
 - Windows 文件名大小写不敏感（`AGENTS.md` 与 `agents.md` 同一文件）。
-- 钩子里的 `claude -p` 我无法在装配时实跑验证，需用户真实 push 才触发。
+- 钩子里的 AI CLI 调用我无法在装配时实跑验证，需用户真实 push 才触发。可用 `DOCSYNC_CLI=claude|opencode` 强制指定用哪个 CLI。
+- 安装位置：Claude Code 放 `~/.claude/skills/md/`（或项目 `.claude/skills/md/`）；opencode 同样识别该路径，也可放 `~/.config/opencode/skills/md/`。
