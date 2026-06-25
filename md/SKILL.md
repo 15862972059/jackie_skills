@@ -1,12 +1,12 @@
 ---
 name: md
-description: 项目文档单一信息源的初始化与同步。新项目首次执行引导生成 AGENTS.md(正文)+CLAUDE.md(@引用);已有文档则以编辑者视角增量同步——合并重复、删过期、修矛盾;并可选装项目级 pre-push 钩子实现提交前自动同步。改完代码想同步/整理文档、或新项目想建文档时用。Works in both Claude Code and opencode. Triggers when the user types /md or asks to init/update/sync/tidy project docs.
-compatibility: Claude Code, opencode
+description: 项目文档单一信息源的初始化与同步。新项目首次执行引导生成 AGENTS.md(正文)+CLAUDE.md(@引用);已有文档则以编辑者视角增量同步——合并重复、删过期、修矛盾;并可选装项目级 pre-push 钩子实现提交前自动同步。改完代码想同步/整理文档、或新项目想建文档时用。Works in Claude Code, opencode, and Codex. Triggers when the user types /md or asks to init/update/sync/tidy project docs.
+compatibility: Claude Code, opencode, Codex
 ---
 
 # /md — 项目文档的初始化与同步
 
-你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目、与具体 AI 工具无关（Claude Code / opencode 均可用），在当前仓库自适应。
+你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目、与具体 AI 工具无关（Claude Code / opencode / Codex 均可用），在当前仓库自适应。
 
 ## 第 0 步：判断走哪条路
 
@@ -37,7 +37,7 @@ ls AGENTS.md agents.md CLAUDE.md 2>/dev/null; wc -l AGENTS.md CLAUDE.md 2>/dev/n
    - 把上一步的正文**移动/整理**到 `AGENTS.md`（按通用结构组织：项目概述 / 技术栈 / 命令 / 项目结构 / 架构 / 核心业务流程 / 数据库 / API / 数据流 / 开发注意事项 / 部署，只保留项目真有的章节）。
    - 在 `AGENTS.md` 顶部加 HTML 注释：说明它是面向所有 AI 工具的单一信息源、更新走 `/md`、勿对它运行 `/init`（若工具有该命令）。
    - 把 `CLAUDE.md` 改写为：顶部一段「⚠️ 正文在 AGENTS.md，勿 /init 本文件」注释 + 一行 `@AGENTS.md`（其余 Claude 专属内容如有再附后）。
-3. **跨工具说明：** `@AGENTS.md` 是 Claude Code 应用层 import（Win/Mac/Linux 一致）；opencode 原生读 `AGENTS.md`（也读 `.claude/skills`、`CLAUDE.md`）；Codex/Antigravity 等直接读 `AGENTS.md` 正文。一份正文，各工具各自入口。
+3. **跨工具说明：** `@AGENTS.md` 是 Claude Code 应用层 import（Win/Mac/Linux 一致）；opencode 原生读 `AGENTS.md`（也读 `.claude/skills`、`.agents/skills`）；**Codex** 读 `.agents/skills` 和 `AGENTS.md`；Antigravity 等其它 AI 编码工具直接读 `AGENTS.md` 正文。一份正文，各工具各自入口。
 4. 建好后 → 进入下方【可选：装 pre-push 钩子】询问。
 
 ---
@@ -164,4 +164,7 @@ fi
 
 - Windows 文件名大小写不敏感（`AGENTS.md` 与 `agents.md` 同一文件）。
 - 钩子里的 AI CLI 调用我无法在装配时实跑验证，需用户真实 push 才触发。可用 `DOCSYNC_CLI=claude|opencode` 强制指定用哪个 CLI。
-- 安装位置：Claude Code 放 `~/.claude/skills/md/`（或项目 `.claude/skills/md/`）；opencode 同样识别该路径，也可放 `~/.config/opencode/skills/md/`。
+- 安装位置（`SKILL.md` 格式是跨工具通用的，所有工具都读同一份文件）：
+  - Claude Code：`~/.claude/skills/md/`（或项目 `.claude/skills/md/`）
+  - opencode：同上，也可放 `~/.config/opencode/skills/md/`
+  - Codex：`~/.agents/skills/md/`（或项目 `.agents/skills/md/`）

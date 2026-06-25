@@ -1,7 +1,7 @@
 # jackie_skills
 
-> A collection of [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) skills.
-> 一组 [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) 技能集合。
+> A collection of [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) / Codex skills.
+> 一组 [Claude Code](https://claude.ai/code) / [opencode](https://opencode.ai) / Codex 技能集合。
 
 [English](#english) · [中文](#中文)
 
@@ -31,7 +31,7 @@ The idea: most AI tools look for an `AGENTS.md`, while Claude Code looks for `CL
 
 ### Install
 
-Works in both **Claude Code** and **opencode** (opencode natively discovers `~/.claude/skills/`).
+Works in **Claude Code**, **opencode**, and **Codex** (all share the same `SKILL.md` format).
 
 ```bash
 git clone https://github.com/15862972059/jackie_skills.git
@@ -41,15 +41,22 @@ cp -r jackie_skills/md ~/.claude/skills/md
 
 # opencode — also reads ~/.claude/skills, or use its own dir:
 cp -r jackie_skills/md ~/.config/opencode/skills/md
+
+# Codex — use .agents/skills dir:
+cp -r jackie_skills/md ~/.agents/skills/md
 ```
 
-Or for a single project (both tools read `.claude/skills/`):
+Or for a single project (all tools read their respective paths):
 
 ```bash
+# Claude Code / opencode
 cp -r jackie_skills/md <your-project>/.claude/skills/md
+
+# Codex
+cp -r jackie_skills/md <your-project>/.agents/skills/md
 ```
 
-Then run `/md` in Claude Code or opencode.
+Then run `/md` in your tool.
 
 ---
 
@@ -77,7 +84,7 @@ Then run `/md` in Claude Code or opencode.
 
 ### 安装
 
-**Claude Code 和 opencode 均可用**（opencode 原生识别 `~/.claude/skills/`）。
+**Claude Code / opencode / Codex 均可用**（三工具共享同一份 `SKILL.md` 格式）。
 
 ```bash
 git clone https://github.com/15862972059/jackie_skills.git
@@ -87,15 +94,22 @@ cp -r jackie_skills/md ~/.claude/skills/md
 
 # opencode — 同样读 ~/.claude/skills，或放到它自己的目录：
 cp -r jackie_skills/md ~/.config/opencode/skills/md
+
+# Codex — 放到 .agents/skills 目录：
+cp -r jackie_skills/md ~/.agents/skills/md
 ```
 
-或仅装到单个项目（两个工具都读 `.claude/skills/`）：
+或仅装到单个项目（各工具读各自路径）：
 
 ```bash
+# Claude Code / opencode
 cp -r jackie_skills/md <你的项目>/.claude/skills/md
+
+# Codex
+cp -r jackie_skills/md <你的项目>/.agents/skills/md
 ```
 
-然后在 Claude Code 或 opencode 里运行 `/md`。
+然后在你的 AI 工具里运行 `/md`。
 
 ---
 
