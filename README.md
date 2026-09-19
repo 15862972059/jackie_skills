@@ -29,6 +29,23 @@ The idea: most AI tools look for an `AGENTS.md`, while Claude Code looks for `CL
 - Reduce > add, merge > append, delete > keep, fix > coexist.
 - Never fabricate — when unsure about a rule or field, read the real code to confirm.
 
+#### `/md` Design Notes · [中文](#md-设计手记)
+
+**The problems** we kept hitting as AI coding tools accumulate instructions:
+
+- **Doc drift** — parallel copies of project docs diverge, and stale rules keep steering agents invisibly.
+- **Context bloat** — "read all docs before every edit" style mandates burn context on every task; oversized skill descriptions get truncated by hosts, and vague triggers load irrelevant skills.
+- **Over-steering** — itinerary-style micro-steps and hard "always ask first" clauses, written for weaker models, now constrain stronger ones into stopping earlier than intended.
+
+**How this project solves them:**
+
+- Single source of truth + *editor, not logger* incremental sync: merge duplicates, delete stale, fix contradictions; docs must not grow without reason.
+- Progressive disclosure **in the skill itself**: `md/SKILL.md` is a ~50-line router; the first-run flow and hook docs live in `md/references/`, and the `pre-push` hook ships as a ready script (`md/scripts/pre-push`) instead of being retyped from prose — the model only reads what the current path needs.
+- Progressive disclosure **in what it generates**: the produced `AGENTS.md` keeps a minimal always-needed core (target ≤ 80 lines); long topics (architecture / database / API / workflow / deployment) split into `docs/agents/*.md` **only past a size threshold**, each leaving one "read X when doing Y" pointer behind. Small projects stay single-file.
+- A written **definition of done** replaces nag checklists, so a sync ends neither early nor endless.
+
+**The thinking** in one line: apply to the docs themselves what current agent-guidance recommends — shortest precise triggers, context on demand, trust-style boundaries, completion defined upfront. Full source notes: [docs/guides/rethinking-skills-prompts-gpt6-astra.md](docs/guides/rethinking-skills-prompts-gpt6-astra.md) (summary of OpenAI's guide by Eric Provencher, 2026-09-11).
+
 ### Install
 
 Works in **Claude Code**, **opencode**, and **Codex** (all share the same `SKILL.md` format).
@@ -81,6 +98,23 @@ Then run `/md` in your tool.
 - 文档是**规则手册**而非 changelog——写「系统现在是什么样」，历史归 `git log`。
 - 减 > 增，合并 > 追加，删除 > 保留，修正 > 并存。
 - 不臆造——拿不准的规则/字段，读真实代码确认。
+
+#### `/md` 设计手记 · [English](#md-design-notes--中文)
+
+**当前的问题**（AI 编码工具的指令越积越多后普遍出现）：
+
+- **文档漂移**——多份并行的项目文档各自演化互相矛盾，过期规则还在隐形地指挥 agent。
+- **上下文膨胀**——「每次编辑前读完所有文档」式指令每次都烧上下文；技能描述过长会被宿主截断，触发词写得太宽会加载用不上的技能。
+- **过度牵引**——为弱模型写的菜谱式步骤和强硬「必须先请示」条款，到了强模型身上反而束缚发挥、诱发早停。
+
+**本项目怎么解决：**
+
+- 单一信息源 +「编辑者而非记录员」增量同步：合并重复、删过期、修矛盾，文档不许无谓变长。
+- **技能自身**渐进披露：`md/SKILL.md` 只做约 50 行路由；首建流程与钩子说明放 `md/references/`，`pre-push` 以现成脚本资产（`md/scripts/pre-push`）随包发布而不是让模型从文档里抄写——模型只读当下路径需要的内容。
+- **产物**同样渐进披露：生成的 `AGENTS.md` 只保留每次会话都需要的最小集（目标 ≤80 行）；长主题（架构/数据库/API/业务流程/部署）**超过阈值才**拆到 `docs/agents/*.md`，正文留一行「改 X 时读 Y」按需指路；小项目保持单文件，绝不为套模板而拆。
+- 用写明的**完成定义**替代催促式自检清单，同步既不早停也不无限蔓延。
+
+**思路**一句话：把新一代 agent 指南对指令库的要求——最短精确触发、按需上下文、信任式边界、预先定义完成——反过来用在文档本身上。出处与要点笔记：[docs/guides/rethinking-skills-prompts-gpt6-astra.md](docs/guides/rethinking-skills-prompts-gpt6-astra.md)（OpenAI 开发者博客，作者 Eric Provencher，2026-09-11）。
 
 ### 安装
 

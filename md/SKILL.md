@@ -1,170 +1,54 @@
 ---
 name: md
-description: 项目文档单一信息源的初始化与同步。新项目首次执行引导生成 AGENTS.md(正文)+CLAUDE.md(@引用);已有文档则以编辑者视角增量同步——合并重复、删过期、修矛盾;并可选装项目级 pre-push 钩子实现提交前自动同步。改完代码想同步/整理文档、或新项目想建文档时用。Works in Claude Code, opencode, and Codex. Triggers when the user types /md or asks to init/update/sync/tidy project docs.
+description: 项目文档单一信息源：以编辑者视角增量同步 AGENTS.md（合并重复、删过期、修矛盾），或为新项目首建 AGENTS.md + CLAUDE.md（@引用）。用户输入 /md，或说"改完代码同步/整理项目文档""新项目写 AGENTS.md"时用。可选 pre-push 提交前自动同步。首建与钩子细节按需读 references/。
 compatibility: Claude Code, opencode, Codex
 ---
 
 # /md — 项目文档的初始化与同步
 
-你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目、与具体 AI 工具无关（Claude Code / opencode / Codex 均可用），在当前仓库自适应。
+你是项目文档的**编辑者，不是日志记录员**。文档要读起来像「此刻、一个新接手的人需要知道的真相」。本 skill 与具体项目、与具体 AI 工具无关，在当前仓库自适应。
 
-## 第 0 步：判断走哪条路
+**路径基准**：本文中的相对路径以本技能目录（SKILL.md 所在目录）为基准；技能目录必须整目录安装（references/ 与 scripts/ 随 install.sh / install.ps1 一并复制）。
 
-在仓库根目录检查文档现状，据此分流：
+## 第 0 步：分流
 
-- **A. 首建**：既无 `AGENTS.md` 也无 `CLAUDE.md`（或 `CLAUDE.md` 是空壳/模板）→ 走【首建流程】。
-- **B. 同步**：已有正文文件 → 走【同步流程】。
+检查仓库根目录的文档现状（注意 Windows 大小写不敏感，`AGENTS.md` 与 `agents.md` 是同一文件）：
 
-先确定**正文文件**（单一信息源，优先级）：
-1. 有 `AGENTS.md` → 它是正文。
-2. `CLAUDE.md` 仅含 `@AGENTS.md` 这类引用 → 正文是 `AGENTS.md`，**不要改 CLAUDE.md**。
-3. 只有完整的 `CLAUDE.md` → 它是正文。
+- 既无正文型 `AGENTS.md`、`CLAUDE.md` 也是空壳/模板 → **首建**：读 [references/init-flow.md](references/init-flow.md) 照做。
+- 已有正文 → 走下方**同步流程**。
+- 用户问到「提交前自动同步 / pre-push 钩子」→ 读 [references/docsync-hook.md](references/docsync-hook.md)。
 
-```bash
-ls AGENTS.md agents.md CLAUDE.md 2>/dev/null; wc -l AGENTS.md CLAUDE.md 2>/dev/null
-```
+正文文件（单一信息源）判定优先序：有 `AGENTS.md` 即它是正文；`CLAUDE.md` 仅含 `@AGENTS.md` 引用时正文仍是 `AGENTS.md`，**不要改 CLAUDE.md**；只有完整 `CLAUDE.md` 时它是正文。
 
----
-
-## 【首建流程】(A)
-
-目标产物：`AGENTS.md`（面向所有 AI 工具的正文）+ `CLAUDE.md`（仅 `@AGENTS.md` 引用 + 可放 Claude 专属内容）。
-
-1. **生成基础内容（扫描代码库）。**
-   - **Claude Code**：用 Skill 工具调用内置 `init`，借它的扫描能力生成一份 `CLAUDE.md` 草稿。
-   - **opencode / 其它无内置 init 的工具**：自己扫描代码库（读 README、依赖清单、目录结构、入口文件、路由/模型定义等）整理出项目概况，直接落到 `AGENTS.md`。
-2. **重构成双文件单一信息源：**
-   - 把上一步的正文**移动/整理**到 `AGENTS.md`（按通用结构组织：项目概述 / 技术栈 / 命令 / 项目结构 / 架构 / 核心业务流程 / 数据库 / API / 数据流 / 开发注意事项 / 部署，只保留项目真有的章节）。
-   - 在 `AGENTS.md` 顶部加 HTML 注释：说明它是面向所有 AI 工具的单一信息源、更新走 `/md`、勿对它运行 `/init`（若工具有该命令）。
-   - 把 `CLAUDE.md` 改写为：顶部一段「⚠️ 正文在 AGENTS.md，勿 /init 本文件」注释 + 一行 `@AGENTS.md`（其余 Claude 专属内容如有再附后）。
-3. **跨工具说明：** `@AGENTS.md` 是 Claude Code 应用层 import（Win/Mac/Linux 一致）；opencode 原生读 `AGENTS.md`（也读 `.claude/skills`、`.agents/skills`）；**Codex** 读 `.agents/skills` 和 `AGENTS.md`；Antigravity 等其它 AI 编码工具直接读 `AGENTS.md` 正文。一份正文，各工具各自入口。
-4. 建好后 → 进入下方【可选：装 pre-push 钩子】询问。
-
----
-
-## 【同步流程】(B)
+## 【同步流程】
 
 原则：
 
 - **文档是规则手册，不是 changelog。** 写「系统现在是什么样」，历史归 git log。
 - **减 > 增，合并 > 追加，删除 > 保留，修正 > 并存。** 同步后应更准、未必更长。
-- **判据：下一个接手的人需要知道吗？** 绝对日期。不臆造——拿不准就读真实代码确认。
+- 判据只有一条：**下一个接手的人需要知道吗？** 日期用绝对日期；不臆造——拿不准就读真实代码确认。
 
-### 1. 盘点改动
-
-```bash
-git status --short
-git diff HEAD --stat
-git diff HEAD
-```
-已提交则比对上次文档同步以来：`git log --oneline -15` + `git diff <last-doc-commit>..HEAD`。
-若工具配了代码索引（如 Claude Code 的 CodeGraph `codegraph_*`）就用它核实哪些路由/模型/函数真变了，否则用 grep/读文件确认。
-
-### 2. 改动 → 章节 影响矩阵
+1. **盘点改动**：`git status --short` + `git diff HEAD --stat` + `git diff HEAD`；已提交则 `git log --oneline -15` 并对上次文档同步点做 diff。宿主配了代码索引就用它核实，否则 grep/读文件确认。
+2. **影响矩阵**（改了什么 → 检查哪些章节；章节在 `AGENTS.md` 或它指路的 `docs/agents/` 子文档里）：
 
 | 改了 | 检查的章节 |
 |------|------|
-| 后端路由 / controller / API | API / Endpoints、数据流 |
+| 路由 / controller / API | API / Endpoints、数据流 |
 | ORM 模型 / schema / migration | 数据库表、模型列表 |
-| 业务逻辑 / service | 核心业务逻辑、业务流程、关键规则 |
-| 配置 / env | 配置、环境变量 |
-| 种子数据 / seed | 种子账号 / 初始数据 |
-| 前端路由（pages.json / router） | 项目结构、路由、入口 |
-| 新增页面 / 模块 | 项目结构、对应流程 |
+| 业务逻辑 / service / 配置 env | 核心业务流程、关键规则、配置与环境变量 |
+| 前端路由 / 新增页面 / 新增顶层目录 | 项目结构、路由与入口 |
 | 依赖清单 | 技术栈、命令 |
-| 新增顶层目录 | 项目结构树 |
 
-仅样式/文案/bugfix → 告知「无需更新」并停止。
+仅样式/文案/纯 bugfix → 告知「无需更新」并给出判断依据，停止。
 
-### 3. 编辑（顺手清理）
+3. **编辑**：用 Edit 做最小 diff，不整文件重写（重写会连带丢掉用户手写经验段）。顺手修本次涉及章节的过期事实与矛盾、合并重复。删除谨慎：只删被代码证伪或明显重复的；手写经验段除非被推翻否则保留；拿不准的保留并在报告里点出。分层纪律：单章节将超约 40 行 → 拆入对应 `docs/agents/` 子文档，正文只留一行按需指路；反之不把子文档内容无故吸回正文。
 
-用 **Edit** 精确替换逐段改，**不要 Write 整文件**。每段顺带：① 以真实代码为准修本次涉及章节；② 扫掉相关的过期/矛盾（被重构的字段、改过的阈值、删掉的端点）；③ 合并重复。
-谨慎删除：只删「已被代码证伪」或「明显重复」的；手写经验段除非被推翻否则保留；拿不准的保留并在报告里点出。
+## 完成定义（以下全部满足才算同步完成）
 
-### 4. 自检
+- 本次改动涉及的每个章节都已核对：更新过，或能说明为何不用更新；
+- 相关的过期、矛盾、重复已顺手清理；
+- 只动了正文文件，没碰引用型 `CLAUDE.md`；
+- 文档没有无谓变长，新增日期均为绝对日期；
+- 已向用户一段话报告：改了哪几段、为什么、清了什么、留什么给用户定夺。
 
-- [ ] 本次涉及章节都更新了？ [ ] 无 changelog 式叙述？ [ ] 顺手清了过期/矛盾/重复？
-- [ ] 新增日期为绝对日期？ [ ] 只动正文文件、没碰引用型 CLAUDE.md？ [ ] 没无谓变长？
-
-### 5. 报告
-
-一段话说明改了哪几段、为什么、顺手清了什么、有哪些留给用户定夺。**不自动 commit**，除非用户要求。
-
----
-
-## 【可选：装项目级 pre-push 钩子】
-
-**仅在首建后、或用户主动要求时**，询问：「要不要装一个项目级 pre-push 钩子，push 前自动用 /md 逻辑同步文档？」
-
-> 为什么是 pre-push 而非全局：项目级钩子只影响本仓库，绝不旁路其它 repo 的钩子（全局 `core.hooksPath` 会有此副作用）。
-
-用户同意才装。安装步骤：
-
-1. 写脚本到 `.git/hooks/pre-push`（本地、不入版本库）。若用户想让钩子随仓库分享，改写到 `.githooks/pre-push` 并 `git config --local core.hooksPath .githooks`。
-2. 脚本内容（已泛化、自带 opt-in 门控与失败放行）：
-
-```sh
-#!/bin/sh
-# pre-push: 检测结构性代码改动且本次未同步 AGENTS.md 时，调 AI CLI（claude 或 opencode）增量更新。
-# 跳过本次: SKIP_DOCSYNC=1 git push
-set -u
-[ "${SKIP_DOCSYNC:-0}" = "1" ] && exit 0
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-AGENTS=""; for f in "$repo_root/AGENTS.md" "$repo_root/agents.md"; do [ -f "$f" ] && AGENTS="$f" && break; done
-[ -z "$AGENTS" ] && exit 0
-range=""
-while read -r l lsha r rsha; do
-  case "$lsha" in *[!0]*) : ;; *) continue ;; esac
-  z="0000000000000000000000000000000000000000"
-  [ "$rsha" = "$z" ] && range="$lsha --not --remotes" || range="$rsha..$lsha"; break
-done
-[ -z "$range" ] && range="HEAD~1..HEAD"
-changed=$(git diff --name-only $range 2>/dev/null); [ -z "$changed" ] && exit 0
-printf '%s\n' "$changed" | grep -qiE '(^|/)agents\.md$' && exit 0
-structural=$(printf '%s\n' "$changed" | grep -E \
-  -e '\.(py|ts|tsx|js|jsx|vue|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|sql|proto)$' \
-  -e '(^|/)(package\.json|pyproject\.toml|go\.mod|Cargo\.toml|pom\.xml|build\.gradle|composer\.json|Gemfile|requirements\.txt)$' \
-  -e '(^|/)(pages\.json)$' -e '(^|/)migrations?/')
-[ -z "$structural" ] && exit 0
-echo "[docsync] 检测到结构性改动但未同步 AGENTS.md："; printf '  %s\n' $structural | head -20
-P="本仓库即将 push。请增量更新根目录 AGENTS.md（单一信息源），只改受影响章节，绝不重建，不碰 CLAUDE.md。改动文件：
-$changed
-先 git diff $range 看改了什么，再对照更新 AGENTS.md 实际存在的对应章节，拿不准的读真实代码确认。无需改动则不动文件。"
-# 探测可用的 AI CLI：优先 claude，其次 opencode（可用 DOCSYNC_CLI 强制指定）
-run_ai() {
-  case "${DOCSYNC_CLI:-auto}" in
-    claude)   claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob" ;;
-    opencode) opencode run "$P" ;;
-    *)
-      if command -v claude >/dev/null 2>&1; then
-        claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
-      elif [ -n "${APPDATA:-}" ] && [ -f "$APPDATA/npm/claude.cmd" ]; then
-        "$APPDATA/npm/claude.cmd" -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
-      elif command -v opencode >/dev/null 2>&1; then
-        opencode run "$P"
-      else
-        return 127
-      fi ;;
-  esac
-}
-echo "[docsync] 正在用 AI CLI 增量更新 AGENTS.md……"
-if run_ai >/dev/null 2>&1; then
-  if ! git -C "$repo_root" diff --quiet -- "$AGENTS" 2>/dev/null; then
-    echo "[docsync] ✅ AGENTS.md 已更新，请 review 后提交再 push（或 SKIP_DOCSYNC=1 git push 直推）"; exit 1
-  else echo "[docsync] 无需改动，放行。"; exit 0; fi
-else
-  echo "[docsync] 未找到 claude/opencode CLI 或调用失败，跳过（不阻塞 push）。可手动 /md 后再 push。"; exit 0
-fi
-```
-
-3. `chmod +x .git/hooks/pre-push`；`sh -n` 验证语法。
-4. 告知用户：钩子已装、如何跳过（`SKIP_DOCSYNC=1 git push`）、如何卸载（删该文件）。
-
-## 注意
-
-- Windows 文件名大小写不敏感（`AGENTS.md` 与 `agents.md` 同一文件）。
-- 钩子里的 AI CLI 调用我无法在装配时实跑验证，需用户真实 push 才触发。可用 `DOCSYNC_CLI=claude|opencode` 强制指定用哪个 CLI。
-- 安装位置（`SKILL.md` 格式是跨工具通用的，所有工具都读同一份文件）：
-  - Claude Code：`~/.claude/skills/md/`（或项目 `.claude/skills/md/`）
-  - opencode：同上，也可放 `~/.config/opencode/skills/md/`
-  - Codex：`~/.agents/skills/md/`（或项目 `.agents/skills/md/`）
+**不自动 commit**，除非用户要求。
