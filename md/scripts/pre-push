@@ -1,0 +1,56 @@
+#!/bin/sh
+# pre-push: 检测结构性代码改动且本次未同步 AGENTS.md 时，调 AI CLI（claude 或 opencode）增量更新。
+# 跳过本次: SKIP_DOCSYNC=1 git push
+set -u
+[ "${SKIP_DOCSYNC:-0}" = "1" ] && exit 0
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+AGENTS=""; for f in "$repo_root/AGENTS.md" "$repo_root/agents.md"; do [ -f "$f" ] && AGENTS="$f" && break; done
+[ -z "$AGENTS" ] && exit 0
+range=""
+while read -r l lsha r rsha; do
+  case "$lsha" in *[!0]*) : ;; *) continue ;; esac
+  z="0000000000000000000000000000000000000000"
+  if [ "$rsha" = "$z" ]; then
+    # 新分支首推：远端无该分支基线，与空树做全量 diff（--not --remotes 在无任何远端 ref 时为空会漏检）
+    range="$(git hash-object -t tree /dev/null) $lsha"
+  else
+    range="$rsha..$lsha"
+  fi
+  break
+done
+[ -z "$range" ] && range="HEAD~1..HEAD"
+changed=$(git diff --name-only $range 2>/dev/null); [ -z "$changed" ] && exit 0
+printf '%s\n' "$changed" | grep -qiE '(^|/)agents\.md$' && exit 0
+structural=$(printf '%s\n' "$changed" | grep -E \
+  -e '\.(py|ts|tsx|js|jsx|vue|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp|sql|proto)$' \
+  -e '(^|/)(package\.json|pyproject\.toml|go\.mod|Cargo\.toml|pom\.xml|build\.gradle|composer\.json|Gemfile|requirements\.txt)$' \
+  -e '(^|/)(pages\.json)$' -e '(^|/)migrations?/')
+[ -z "$structural" ] && exit 0
+echo "[docsync] 检测到结构性改动但未同步 AGENTS.md："; printf '  %s\n' $structural | head -20
+P="本仓库即将 push。请增量更新根目录 AGENTS.md（单一信息源），只改受影响章节，绝不重建，不碰 CLAUDE.md。改动文件：
+$changed
+先 git diff $range 看改了什么，再对照更新 AGENTS.md 实际存在的对应章节，拿不准的读真实代码确认。无需改动则不动文件。"
+# 探测可用的 AI CLI：优先 claude，其次 opencode（可用 DOCSYNC_CLI 强制指定）
+run_ai() {
+  case "${DOCSYNC_CLI:-auto}" in
+    claude)   claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob" ;;
+    opencode) opencode run "$P" ;;
+    *)
+      if command -v claude >/dev/null 2>&1; then
+        claude -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
+      elif [ -n "${APPDATA:-}" ] && [ -f "$APPDATA/npm/claude.cmd" ]; then
+        "$APPDATA/npm/claude.cmd" -p "$P" --allowedTools "Read,Edit,Bash,Grep,Glob"
+      elif command -v opencode >/dev/null 2>&1; then
+        opencode run "$P"
+      else
+        return 127
+      fi ;;
+  esac
+}
+echo "[docsync] 正在用 AI CLI 增量更新 AGENTS.md……"
+if run_ai >/dev/null 2>&1; then
+  if ! git -C "$repo_root" diff --quiet -- "$AGENTS" 2>/dev/null; then
+    echo "[docsync] ✅ AGENTS.md 已更新，请 review 后提交再 push（或 SKIP_DOCSYNC=1 git push 直推）"; exit 1
+  else echo "[docsync] 无需改动，放行。"; exit 0; fi
+else
+  echo "[docsync] 未找到 claude/opencode CLI 或调用失败，跳过（不阻塞 push）。可手动 /md 后再 push。"; exit 0; fi

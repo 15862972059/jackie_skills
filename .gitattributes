@@ -1,0 +1,4 @@
+# 保持 shell 脚本与 git 钩子资产为 LF：Windows autocrlf 检出的 CRLF 会使
+# pre-push 钩子里基于 `read` 的 SHA 比对永不匹配而静默失效。
+*.sh text eol=lf
+md/scripts/pre-push text eol=lf
